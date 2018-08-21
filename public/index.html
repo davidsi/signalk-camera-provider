@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Signal K Node Server">
+    <link rel="shortcut icon" href="img/favicon.png">
+    <title>Signal K Camera Viewer Plugin</title>
+
+    <style>
+        #camera1Div {
+            /* background-color: lime; */
+        }
+        
+        #camera2Div {
+            /* background-color: red; */
+        }
+        
+        #camera3Div {
+            /* background-color: blue; */
+        }
+        
+        #indexDiv {
+            /* background-color: yellow; */
+        }
+        
+        #camera-view1 {
+            /* background-color: chocolate; */
+        }
+
+        #camera-view2 {
+            /* background-color: magenta; */
+        }
+
+        #camera-view3 {
+            /* background-color: palegoldenrod; */
+        }
+
+        .custom-select {
+            display : table-row;
+        }
+
+        .camera-view {
+            display : table-row;
+            height: 100%;
+            width: 100%;
+        }   
+
+        .custom-select-div {
+            height: 100%;
+            width: 100%;
+            display: table;
+        }
+
+        .camera-div {
+            border-color: blue;
+            border-width: 1px;
+            margin:2px;
+            background-color: white;
+        }
+
+        .index-div {
+            border-color: blue;
+            border-width: 1px;
+            margin:2px;
+            background-color: white;
+        }
+        /*
+         * see https://medium.com/flexbox-and-grids/how-to-efficiently-master-the-css-grid-in-a-jiffy-585d0c213577 for the grid example
+         */
+        body {
+            display : grid;
+            grid-template-columns: 50% 50%;
+            grid-template-rows: 50% 50%;
+            min-height: 100%;
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: purple;
+        }
+        
+        /* 
+         * see https://www.kirupa.com/html5/make_body_take_up_full_browser_height.htm as to why this is important for a true grid
+         */
+        html {
+            height: 100%;
+        }
+    </style>    
+    <script src="./jsmpeg.min.js"></script>
+    <script>
+        let cameras = {};
+
+        function showElement( el, toShow ) {
+            document.getElementById(el).style.visibility = toShow ?"visible" :"hidden";
+        }
+
+        showElement( 'joyFi-list',  false );
+        showElement( 'no-joyFi',    false );
+        showElement( 'brb-list',    false );
+        showElement( 'no-joyFi',    false );
+    </script>
+</head>
+
+<body >
+    <div id='camera1Div' class='camera-div'>
+        <div class='custom-select-div' id='select-div1'>
+            <select class='custom-select' id='select1' onchange='selectCameraStream( this.value, "video-canvas1" )'>
+                <option value="0">Select camera:</option>
+            </select>    
+            <div class='camera-view' id='camera-view1'>
+                <canvas id="video-canvas1" width="100%" height="100%"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div id='camera2Div' class='camera-div'>
+        <div class='custom-select-div' id='select-div2'>
+            <select class='custom-select' id='select2' onchange='selectCameraStream( this.value, "video-canvas2")'>
+                <option value="0">Select camera:</option>
+            </select>    
+            <div class='camera-view' id='camera-view2'>
+                <canvas id="video-canvas2" width="100%" height="100%"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div id='camera3Div' class='camera-div'>
+        <div class='custom-select-div' id='select-div3'>
+            <select class='custom-select' id='select3' onchange='selectCameraStream( this.value, "video-canvas3")'>
+                <option value="0">Select camera:</option>
+            </select>    
+            <div class='camera-view' id='camera-view3'>
+                <canvas id="video-canvas3" width="100%" height="100%"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id='indexDiv' class='index-div'>
+        <h2>JoyFi (c) receivers</h2>
+            <ul id='joyFi-list'>
+            </ul>
+        <p id='no-joyFi'>No joyFi (c) devices present</p>
+        <h2>Big Red Button receivers</h2>
+            <ul id='brb-list' >
+            </ul>
+            <p id='no-brb'>No Big Red Button (c) devices present</p>
+        </div>
+
+    <script>
+        // get the camera stream
+        //
+        function selectCameraStream( cameraName, canvasEl ) {
+
+            console.log( 'camera selected: ' + cameraName );
+
+            if( cameraName === '0' ) {
+                console.log( 'nothing selected yet' );
+                return;
+            }
+
+            console.log( 'asking for stream for ' + cameraName );
+            fetch( '/signalk/v1/api//getCameraStream?camera='+cameraName, { credentials: 'same-origin' } )
+            .then( function( response ) {
+                return response.json();
+            })
+            .then( function( responseBody ) {
+
+                console.log( 'got stream port: ' + JSON.stringify(responseBody) );
+
+                if( responseBody.success === true ) {
+
+                    var canvas = document.getElementById( canvasEl );
+                    var url    = "ws://" + responseBody.ipAddress + ":" + responseBody.port;
+                    var player = new JSMpeg.Player( url, {canvas: canvas} );
+                }
+            });
+        }
+
+        // get the camera list
+        //
+        function fillInList( url, ulListEl, noListEl ) {
+
+            // https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+            //
+            fetch( url, { credentials: 'same-origin' })
+            .then( function( response ) {
+                return response.json();
+            })
+            .then( function( responseBody ) {
+
+                let list = Object.keys( responseBody );
+
+                console.log( 'list for ' + url + ' = ' + JSON.stringify(list) + ' : ' + JSON.stringify( responseBody ) );
+
+                if( list.length > 0 ) {
+                    showElement( noListEl, false );
+                    showElement( ulListEl, true );
+                    Object.keys( responseBody ).forEach( key => {
+                        document.getElementById(ulListEl).innerHTML += '<li>' + key + '<span>' +  JSON.stringify(responseBody[key]) + '</span></li>';                  
+                    });
+                }
+                else {
+                    showElement( noListEl, true );
+                    showElement( ulListEl, false );
+                }
+            });
+        };
+
+        // fill in other lists
+        //
+        fillInList( '/signalk/v1/api/vessels/self/environment/inside/big-red-button', 'joyFi-list',  'no-joyFi' );
+        fillInList( '/signalk/v1/api/vessels/self/environment/inside/joyfi-receivers', 'brb-list',   'no-brb' );
+
+        // get the cameras, and then fill them in on each div
+        //
+        fetch( '/signalk/v1/api/vessels/self/environment/cameras', { credentials: 'same-origin' })
+        .then( function( response ) {
+            return response.json();
+        })
+        .then( function( responseBody ) {
+
+            let list = Object.keys( responseBody );
+
+            if( list.length > 0 ) {
+                Object.keys( responseBody ).forEach( key => {
+                    document.getElementById('select1').innerHTML += '<option value=' + key + '><span>' +  JSON.stringify(responseBody[key].name) + '</span></option>';                  
+                    document.getElementById('select2').innerHTML += '<option value=' + key + '><span>' +  JSON.stringify(responseBody[key].name) + '</span></option>';                  
+                    document.getElementById('select3').innerHTML += '<option value=' + key + '><span>' +  JSON.stringify(responseBody[key].name) + '</span></option>';                  
+                });
+            }
+        });
+
+        // Promise.all( apiPaths.map( url => fetch(url, { credentials: 'same-origin' })
+        // .then(res => res.json())))
+        // .then(responses => responses.forEach((response, i) => {
+        //     Object.keys(response).forEach( key => {
+        //         document.getElementById('indexDiv').innerHTML += '<p>' + key + '<span>' +  JSON.stringify(response[key]) + '</span></p>';                  
+        //     })
+        // }));
+
+    </script>
+</body>
+</html>
